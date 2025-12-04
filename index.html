@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <title>Snake 4+</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Стилі -->
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- MediaPipe FaceMesh та Camera Utils для трекінгу голови -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <div class="panel">
+    <h1>Snake 4+</h1>
+
+    <div class="perk">
+      <span>🐍 Фантом</span><span>[Q] / прижмурення</span>
+    </div>
+    <div class="perk">
+      <span>⚡ Турбо</span><span>[E] / підняті брови</span>
+    </div>
+
+    <button class="btn" id="startBtn">Старт</button>
+    <button class="btn secondary" id="restartBtn">Рестарт</button>
+    <button class="btn secondary" id="controlModeBtn">Керування: Голова</button>
+
+    <div class="stats">
+      <div>Рахунок: <span id="score">0</span></div>
+      <div>Щит: <span id="shield">1</span></div>
+      <div>Стан: <span id="state">Очікує старту</span></div>
+      <div>Ефекти: <span id="effects">—</span></div>
+    </div>
+
+    <div class="hint">
+      Управління (ПК):<br>
+      • A / D – поворот<br>
+      • E – тримай для прискорення / або підніми брови (в head-режимі)<br>
+      • Q – режим фантома (2 с, кулдаун) / або прижмурись (в head-режимі)<br>
+      • P – пауза<br><br>
+      Режими керування:<br>
+      • Клавіатура – все як завжди<br>
+      • Голова – змійка повертає туди, куди ти повертаєш голову (камера)<br><br>
+      Телефон:<br>
+      ◀ ▶ – поворот, ⚡ – буст, 👻 – фантом, ⏸ – пауза
+    </div>
+  </div>
+
+  <div class="canvas-wrap">
+    <canvas id="game" width="800" height="560"></canvas>
+    <div class="mobile-controls">
+      <button class="mc-btn" id="btnLeft">◀</button>
+      <button class="mc-btn" id="btnRight">▶</button>
+      <button class="mc-btn" id="btnBoost">⚡</button>
+      <button class="mc-btn" id="btnGhost">👻</button>
+      <button class="mc-btn" id="btnPause">⏸</button>
+    </div>
+  </div>
+</div>
+
+<!-- Логіка гри -->
+<script src="game.js"></script>
+</body>
+</html>
