@@ -42,6 +42,18 @@ let lastSquintTime = 0;
 let squintCooldown = 700; // мс між активаціями фантома
 let browLifted = false;
 
+
+// --- Калібрування брів ---
+let mouthBaseline = null;
+let mouthOpen = false;
+
+// стабілізуючі пороги
+const upperThreshold = 0.02;  // рот відкрився
+const lowerThreshold = 0.01;  // рот точно закрився
+
+
+
+
 // ініціалізація FaceMesh
 function startHeadTracking() {
   if (headTrackingStarted) return;
@@ -101,58 +113,70 @@ function eyebrowLiftAmount(landmarks, left) {
 
 // обробка результатів FaceMesh
 function onFaceResults(results) {
-  // Якщо керування клавіатурою – нічого не зчитуємо
+  // Якщо керування клавіатурою – жести вимкнено
   if (controlMode !== "head") return;
 
-  if (!results.multiFaceLandmarks || !results.multiFaceLandmarks.length) {
-    return;
-  }
+  if (!results.multiFaceLandmarks || !results.multiFaceLandmarks.length) return;
   const landmarks = results.multiFaceLandmarks[0];
 
-  // yaw для повороту головою
+  // ---------- ПОВОРОТ ГОЛОВОЮ ----------
   const leftEye = landmarks[33];
   const rightEye = landmarks[263];
   const nose = landmarks[1];
 
   const midEyesX = (leftEye.x + rightEye.x) / 2;
-  const yaw = nose.x - midEyesX;
-  headYaw = yaw;
+  headYaw = nose.x - midEyesX;
 
-  // ----------- ЖЕСТИ (працюють тільки коли controlMode === head) ------------
 
-  // ---- ПІДНЯТТЯ БРІВ (BOOST) ----
-  const browLeft = landmarks[70].y;
-  const browRight = landmarks[300].y;
-  const eyeLeft = landmarks[159].y;
-  const eyeRight = landmarks[386].y;
+  // ----------- ВІДКРИВАННЯ РОТА (BOOST) ------------
+  if (controlMode === "head") {
+      const upperLip = landmarks[13].y;
+      const lowerLip = landmarks[14].y;
 
-  const browLiftLeft = eyeLeft - browLeft;
-  const browLiftRight = eyeRight - browRight;
+      const mouthGap = lowerLip - upperLip;
 
-  browLifted = (browLiftLeft > 0.04 || browLiftRight > 0.04);
+      // Перше калібрування (рот закритий)
+      if (mouthBaseline === null) {
+          mouthBaseline = mouthGap;
+          return;
+      }
 
-  // ---- ПРИЖМУРЕННЯ (GHOST) ----
-  const blinkL = landmarks[159].y - landmarks[145].y;
-  const blinkR = landmarks[386].y - landmarks[374].y;
+      // Плавне оновлення baseline — щоб враховувати невеликі рухи голови
+      mouthBaseline = mouthBaseline * 0.95 + mouthGap * 0.05;
 
-  const leftOpen = Math.abs(blinkL);
-  const rightOpen = Math.abs(blinkR);
+      const diff = mouthGap - mouthBaseline;
+
+      // 📌 Гістерезис:
+      if (!mouthOpen && diff > upperThreshold) {
+          mouthOpen = true;     // рот справді відкрився
+      }
+      else if (mouthOpen && diff < lowerThreshold) {
+          mouthOpen = false;    // рот повернувся в норму
+      }
+  } else {
+      mouthOpen = false;
+  }
+
+
+  // ---------- ПРИЖМУРЕННЯ (GHOST) ----------
+  const blinkL = Math.abs(landmarks[159].y - landmarks[145].y);
+  const blinkR = Math.abs(landmarks[386].y - landmarks[374].y);
 
   const squintThreshold = 0.008;
   const now = performance.now();
 
   if (
-    (leftOpen < squintThreshold || rightOpen < squintThreshold) &&
+    (blinkL < squintThreshold || blinkR < squintThreshold) &&
     now - lastSquintTime > squintCooldown
   ) {
     lastSquintTime = now;
 
-    // Активуємо фантом ТІЛЬКИ якщо в head-mode
     if (game && game.player && !game.player.ghost && game.player.ghostCooldown <= 0) {
       activateGhost();
     }
   }
 }
+
 
 
 // --------- Класи ---------
@@ -615,9 +639,9 @@ function update(dt) {
 
   // Boost: E / мобільний / підняті брови (але тільки при керуванні головою)
   const boostByKeys = (keys['KeyE'] || touchControls.boost);
-  const boostByBrow = (controlMode === 'head' && browLifted);
+  const boostByMouth = (controlMode === 'head' && mouthOpen);
 
-  const boostFactor = (boostByKeys || boostByBrow) ? 1.8 : 1;
+  const boostFactor = (boostByKeys || boostByMouth) ? 1.8 : 1;
 
   p.speed = p.baseSpeed * boostFactor;
 
@@ -885,14 +909,31 @@ restartBtn.addEventListener('click', () => {
 // --------- Перемикач керування ---------
 controlModeBtn.addEventListener('click', () => {
   if (controlMode === 'keyboard') {
+
     controlMode = 'head';
     controlModeBtn.textContent = 'Керування: Клавіатура';
+
     startHeadTracking();
+
+    // Перекалібрувати брови через 0.5с після увімкнення камери
+    setTimeout(() => {
+      browBaseline = null;
+      browSmoothCounter = 0;
+      browLifted = false;
+    }, 500);
+
   } else {
+
     controlMode = 'keyboard';
     controlModeBtn.textContent = 'Керування: Голова';
+
+    // Повністю вимикаємо всі жести
+    browLifted = false;
+    browBaseline = null;
+    browSmoothCounter = 0;
   }
 });
+
 
 // ---- Мобільні кнопки ----
 function bindHoldButton(btn, onDown, onUp) {
